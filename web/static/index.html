@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>持仓管理 · 客户工具</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<!-- ==================== 顶部 ==================== -->
+<header class="topbar">
+  <div class="topbar-main">
+    <span class="brand">持仓管理 · 客户工具</span>
+    <span class="version">V0.2_web_20260809</span>
+  </div>
+  <div class="topbar-sub">
+    每周自动分析 · 当前时间 <span id="clock">--</span>
+    · <span id="envInfo">Windows | Python | Node</span>
+  </div>
+</header>
+
+<!-- ==================== 操作工具栏 ==================== -->
+<div class="toolbar">
+  <label class="ck"><input type="checkbox" id="forceRefresh"> 强制刷新最新行情（较慢）</label>
+  <label class="ck"><input type="checkbox" id="autoTrack"> 自动跟踪（按推荐更新持仓）</label>
+  <span class="spacer"></span>
+  <button class="btn primary" id="btnAnalyze">保存并分析</button>
+  <button class="btn" id="btnReport">打开 HTML 报告</button>
+  <button class="btn" id="btnLog">日志</button>
+  <span id="statusText" class="status">就绪</span>
+</div>
+
+<!-- 进度条 -->
+<div class="progress-wrap">
+  <div class="progress-bar" id="progressBar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  <span class="progress-state" id="progressState">等待</span>
+</div>
+
+<div class="layout">
+  <!-- ==================== 左侧：录入 ==================== -->
+  <aside class="sidebar">
+
+    <div class="card">
+      <div class="card-title">① 客户持仓录入</div>
+      <div class="field">
+        <label>分类</label>
+        <select id="poolCls">
+          <option value="all">全部</option>
+          <option value="sh">沪市</option>
+          <option value="sz">深市</option>
+          <option value="bj">北交所</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>标的（<span id="poolCount">--</span> 只可选）</label>
+        <input id="poolInput" list="poolList" placeholder="输入代码或名称搜索">
+        <datalist id="poolList"></datalist>
+      </div>
+      <div class="field">
+        <label>买入金额（元）</label>
+        <input id="holdAmount" type="number" value="10000" min="100" step="100">
+      </div>
+      <div class="field">
+        <label class="ck"><input type="checkbox" id="holdDingtou"> 该标的为定投（每月定投）</label>
+      </div>
+      <div class="btn-row">
+        <button class="btn primary" id="btnAdd">+ 添加/更新持仓</button>
+        <button class="btn danger" id="btnDel">删除选中</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">当前持仓（<span id="holdCount">0</span> 只）</div>
+      <table class="mini">
+        <thead><tr><th>标的</th><th class="num">金额(元)</th><th>定投</th><th>买入日期</th></tr></thead>
+        <tbody id="holdTable"></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <div class="card-title">每周定投预算 / 新建仓预算</div>
+      <div class="field">
+        <label>定投预算（元/周）</label>
+        <input id="setWeekly" type="number" value="10000" min="0" step="100">
+      </div>
+      <div class="field">
+        <label>新建仓预算（元/只）</label>
+        <input id="setNewpos" type="number" value="5000" min="0" step="100">
+      </div>
+      <div class="field">
+        <label class="ck"><input type="checkbox" id="setAutoTrack"> 开启自动跟踪</label>
+      </div>
+      <div class="hint">开启 [自动跟踪] 后保存并分析会自动按推荐更新持仓金额。</div>
+    </div>
+
+  </aside>
+
+  <!-- ==================== 右侧：主区 Tabs ==================== -->
+  <main class="main">
+    <div class="tabs">
+      <div class="tab active" data-tab="card">① 持仓操作卡</div>
+      <div class="tab" data-tab="rec">② 本周推荐</div>
+      <div class="tab" data-tab="actions">③ 自动调仓记录</div>
+      <div class="tab" data-tab="bt">④ 历史回测</div>
+      <div class="tab" data-tab="html">⑤ HTML 报告</div>
+      <div class="tab" data-tab="md">⑥ MD 报告</div>
+      <div class="tab" data-tab="log">⑦ 下载日志</div>
+    </div>
+
+    <!-- Tab: 持仓操作卡 -->
+    <div class="tab-pane active" id="pane-card">
+      <div class="pane-head">
+        <span>每只持仓按质量+动量+站线+段regime 给出操作建议</span>
+        <span class="signal" id="cardSignal">--</span>
+      </div>
+      <table class="main-tab">
+        <thead>
+          <tr><th>代码</th><th>名称</th><th>类别</th><th>市场</th><th class="num">评分</th>
+              <th>建议</th><th>本周操作</th><th>说明</th></tr>
+        </thead>
+        <tbody id="cardTable"></tbody>
+      </table>
+      <div class="empty" id="cardEmpty">暂无持仓，请先在左侧录入或直接 [保存并分析]</div>
+    </div>
+
+    <!-- Tab: 本周推荐 -->
+    <div class="tab-pane" id="pane-rec">
+      <table class="main-tab">
+        <thead><tr><th>代码</th><th>名称</th><th>类别</th><th>市场</th><th class="num">评分</th>
+                <th>建议</th><th>本周操作</th><th>说明</th></tr></thead>
+        <tbody id="recTable"></tbody>
+      </table>
+      <div class="empty" id="recEmpty">暂无推荐，请先 [保存并分析]</div>
+    </div>
+
+    <!-- Tab: 自动调仓记录 -->
+    <div class="tab-pane" id="pane-actions">
+      <table class="main-tab">
+        <thead><tr><th>时间</th><th>信号日</th><th>标的</th><th>操作</th><th>详情</th></tr></thead>
+        <tbody id="actionTable"></tbody>
+      </table>
+      <div class="empty" id="actionEmpty">暂无调仓记录（开启自动跟踪后保存并分析才会产生）</div>
+    </div>
+
+    <!-- Tab: 历史回测 -->
+    <div class="tab-pane" id="pane-bt">
+      <div class="grid2">
+        <div class="chart-box"><div class="chart-label">年化收益率（全样本 1996+）</div>
+          <canvas id="annChart"></canvas></div>
+        <div class="chart-box"><div class="chart-label">夏普比率</div>
+          <canvas id="shpChart"></canvas></div>
+      </div>
+      <div id="btTable"></div>
+      <div class="chart-box tall"><div class="chart-label">策略长期净值曲线（B vs current，对数轴）</div>
+        <canvas id="curveChart"></canvas></div>
+      <div class="note">
+        <b>结论</b>（基于本机最新同快照重算、<b>修复 B 段指数缺失/未成熟时退化为"无脑放行"的缺陷后</b>，1687 只含北交所、周线 1990+）：
+        年化排序 <span class="mkt" style="background:#4aa3ff">current(上证)≈11.4%</span> ≈ <b>B(分市场段,修复后)≈10.8%</b> &gt;
+        <span class="mkt" style="background:#2ecc71">C(内生)9.2%</span> &gt; A(全指)6.7% &gt; E(尾部)1.7%。
+        修复前 B 因早期段指数缺失直接放行、回撤高达 -68%（与无 regime 的 C 同）；修复为"回退父指数(上证)门控"后，
+        B 回撤收敛到 -56%、2014+ 年化从 0.6% 回升到 7.2%，长期表现已与上证单指数门控<b>基本持平</b>（残差来自深市个股改由深证成指而非上证门控——"更精细"但方向不必然更优）。
+        由此确认 B 的"分市场段门控"原意图成立，<b>可作为 live 默认 gate</b>；E（尾部降仓）经多参数验证被否定（全样本 1.7%、2014+ -3.5%）。
+      </div>
+      <div class="note">
+        <b>风控规则</b>：① 仓位 5万元 / 目标 3-4 仓 / 暴露 0.9；② 买入条件 = 质量门(ROE≥10% + 自由现金流转正 + ≥3年报告) + 52周动量为正 + 站上56周均线 + 所属段指数站上56周线；③ 双退出（非价格止损）：估值泡沫信号 / 基本面恶化；亏损 -10% 不作为机械止损线；④ 任一段指数跌破56周均线即该段清仓，全盘普跌时整体空仓。
+      </div>
+    </div>
+
+    <!-- Tab: HTML 报告 -->
+    <div class="tab-pane" id="pane-html">
+      <div class="report-actions">
+        <button class="btn primary" id="btnOpenHtml">打开最新 HTML 报告</button>
+        <span class="hint">报告由 [保存并分析] 时生成（dashboard_&lt;信号日&gt;.html）</span>
+      </div>
+      <iframe id="htmlFrame" class="report-frame" src="/report/latest"></iframe>
+    </div>
+
+    <!-- Tab: MD 报告 -->
+    <div class="tab-pane" id="pane-md">
+      <div class="report-actions">
+        <button class="btn primary" id="btnMdDownload">生成并下载 MD 报告</button>
+        <button class="btn" id="btnMdPreview">预览</button>
+      </div>
+      <pre id="mdPreview" class="md-box">（点 [预览] 查看报告内容）</pre>
+    </div>
+
+    <!-- Tab: 下载日志 -->
+    <div class="tab-pane" id="pane-log">
+      <div class="log-stats" id="logStats">
+        <span>总计 <b>--</b></span><span class="success">成功 <b>--</b></span>
+        <span class="warn">警告 <b>--</b></span><span class="err">错误 <b>--</b></span>
+        <span>最后: <b>--</b></span>
+      </div>
+      <div class="report-actions">
+        <button class="btn primary" id="btnLogDownload">下载日志文件</button>
+        <button class="btn" id="btnLogRefresh">刷新</button>
+        <button class="btn" id="btnLogCopy">复制全部</button>
+        <select id="logFilter" class="filter-sel">
+          <option value="all">全部级别</option>
+          <option value="success">仅成功</option>
+          <option value="warn">仅警告</option>
+          <option value="error">仅错误</option>
+          <option value="info">仅信息</option>
+        </select>
+      </div>
+      <div id="logBox" class="md-box log-list">（运行记录显示在这里，最多 200 行）</div>
+    </div>
+
+  </main>
+</div>
+
+<footer>本工具仅供研究参考，不构成个人投资建议。数据来源：通达信本地行情 + 东方财富基本面 + 自研回测框架。</footer>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
