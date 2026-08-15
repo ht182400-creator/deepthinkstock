@@ -1,0 +1,44 @@
+# ---------- Python ----------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# ---------- 大文件数据（不提交，本地生成）----------
+# 超 GitHub 100MB 限制
+daily_broad.json
+daily_kc.json
+all_xdxr.csv
+universe_big.json
+universe.json
+fundamentals.json
+fundamentals_broad.json
+qfq_prices/
+
+# ---------- 日志/缓存 ----------
+*.log
+fetch_*.log
+fetch_broad.log
+
+# ---------- Web 运行时 ----------
+web/data/
+web/_tmp*.html
+web/_tmp*.md
+
+# ---------- 工具/工作区 ----------
+.workbuddy/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# ---------- 报告产物（按需提交，默认排除）----------
+# 如果希望把某个 dashboard 快照也提交，用 git add -f 强制添加
+dashboard_*.html
+live_buy_list_*.txt
+live_compare.json
+buy_list*.html
+buy_list*.json
+results*.json
+regime_basis_backtest.html
